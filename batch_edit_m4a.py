@@ -1,8 +1,9 @@
 import os
-import re
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TPE1, TIT2, TRCK, TLEN, TENC, TSSE, TALB
+from mutagen.id3 import ID3, TPE1, TIT2, TRCK, TLEN, TENC, TSSE
+from mutagen.mp4 import MP4, MP4Cover
 import last_folder_helper
+import re
 
 def clean_title(filename):
     name = os.path.splitext(filename)[0]
@@ -12,21 +13,24 @@ def clean_title(filename):
     name = name.strip()
     return name
 
-def build_new_tags(old_tags, clean_name, artist_name):
+def build_new_id3_tags(old_tags, clean_name, artist_name):
     new_tags = ID3()
     new_tags.add(TIT2(encoding=3, text=clean_name))
     new_tags.add(TPE1(encoding=3, text=artist_name))
     if old_tags is not None:
-        if "TALB" in old_tags:
-            new_tags.add(TALB(encoding=3, text=old_tags["TALB"].text[0]))
-        if "TRCK" in old_tags:
-            new_tags.add(TRCK(encoding=3, text=old_tags["TRCK"].text[0]))
-        if "TLEN" in old_tags:
-            new_tags.add(TLEN(encoding=3, text=old_tags["TLEN"].text[0]))
-        if "TENC" in old_tags:
-            new_tags.add(TENC(encoding=3, text=old_tags["TENC"].text[0]))
-        if "TSSE" in old_tags:
-            new_tags.add(TSSE(encoding=3, text=old_tags["TSSE"].text[0]))
+        for tag in ["TRCK", "TLEN", "TENC", "TSSE"]:
+            if tag in old_tags:
+                new_tags.add(old_tags[tag])
+    return new_tags
+
+def build_new_mp4_tags(old_tags, clean_name, artist_name):
+    new_tags = {}
+    new_tags["\xa9nam"] = clean_name
+    new_tags["\xa9ART"] = artist_name
+    if old_tags is not None:
+        for key in ["\xa9alb", "trkn", "disk", "\xa9day", "\xa9gen", "\xa9wrt", "covr"]:
+            if key in old_tags:
+                new_tags[key] = old_tags[key]
     return new_tags
 
 def edit_folder_tags(folder_path, artist_name):
@@ -35,15 +39,21 @@ def edit_folder_tags(folder_path, artist_name):
         return
     changed_count = 0
     for filename in os.listdir(folder_path):
-        if not filename.lower().endswith(".mp3"):
+        if not (filename.lower().endswith(".mp3") or filename.lower().endswith(".m4a")):
             continue
         mp3_path = os.path.join(folder_path, filename)
         try:
-            audio = MP3(mp3_path, ID3=ID3)
             clean_name = clean_title(filename)
-            new_tags = build_new_tags(audio.tags, clean_name, artist_name)
-            audio.tags = new_tags
-            audio.save(v2_version=3, v1=0)
+            if filename.lower().endswith(".mp3"):
+                audio = MP3(mp3_path, ID3=ID3)
+                new_tags = build_new_id3_tags(audio.tags, clean_name, artist_name)
+                audio.tags = new_tags
+                audio.save(v2_version=3, v1=0)
+            else:
+                audio = MP4(mp3_path)
+                new_tags = build_new_mp4_tags(audio.tags, clean_name, artist_name)
+                audio.tags = new_tags
+                audio.save()
             print("Updated:", filename, "→ Title:", clean_name, "Artist:", artist_name)
             changed_count += 1
         except Exception as e:
