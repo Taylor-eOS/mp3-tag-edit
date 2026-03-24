@@ -12,10 +12,11 @@ def clean_title(filename):
     name = name.strip()
     return name
 
-def build_new_tags(old_tags, clean_name, artist_name):
+def build_new_tags(old_tags, clean_name, artist_name, update_artist):
     new_tags = ID3()
     new_tags.add(TIT2(encoding=3, text=clean_name))
-    new_tags.add(TPE1(encoding=3, text=artist_name))
+    if update_artist and artist_name:
+        new_tags.add(TPE1(encoding=3, text=artist_name))
     if old_tags is not None:
         if "TALB" in old_tags:
             new_tags.add(TALB(encoding=3, text=old_tags["TALB"].text[0]))
@@ -29,7 +30,7 @@ def build_new_tags(old_tags, clean_name, artist_name):
             new_tags.add(TSSE(encoding=3, text=old_tags["TSSE"].text[0]))
     return new_tags
 
-def edit_folder_tags(folder_path, artist_name):
+def edit_folder_tags(folder_path, artist_name, update_artist):
     if not os.path.isdir(folder_path):
         print("Folder not found")
         return
@@ -41,10 +42,13 @@ def edit_folder_tags(folder_path, artist_name):
         try:
             audio = MP3(mp3_path, ID3=ID3)
             clean_name = clean_title(filename)
-            new_tags = build_new_tags(audio.tags, clean_name, artist_name)
+            new_tags = build_new_tags(audio.tags, clean_name, artist_name, update_artist)
             audio.tags = new_tags
             audio.save(v2_version=3, v1=0)
-            print("Updated:", filename, "→ Title:", clean_name, "Artist:", artist_name)
+            if update_artist:
+                print("Updated:", filename, "→ Title:", clean_name, "Artist:", artist_name)
+            else:
+                print("Updated:", filename, "→ Title:", clean_name)
             changed_count += 1
         except Exception as e:
             print("Error with file", filename, ":", str(e))
@@ -53,10 +57,13 @@ def edit_folder_tags(folder_path, artist_name):
 if __name__ == "__main__":
     default = last_folder_helper.get_last_folder()
     folder = input(f"Folder with mp3 files ({default}): ").strip() or default
-    artist = input("Artist name for all files: ").strip() or "Michael Jackson"
+    artist = input("Artist name for all files (empty for none): ").strip()
+    update_artist = bool(artist)
+    if not artist:
+        artist = "Michael Jackson"  #fallback, but will not be used
     last_folder_helper.save_last_folder(folder)
-    if not folder or not artist:
-        print("Folder path and artist name are required")
+    if not folder:
+        print("Folder path is required")
     else:
-        edit_folder_tags(folder, artist)
+        edit_folder_tags(folder, artist, update_artist)
 
