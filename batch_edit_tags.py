@@ -12,6 +12,21 @@ def clean_title(filename):
     name = name.strip()
     return name
 
+def build_new_tags(old_tags, clean_name, artist_name):
+    new_tags = ID3()
+    new_tags.add(TIT2(encoding=3, text=clean_name))
+    new_tags.add(TPE1(encoding=3, text=artist_name))
+    if old_tags is not None:
+        if "TRCK" in old_tags:
+            new_tags.add(TRCK(encoding=3, text=old_tags["TRCK"].text[0]))
+        if "TLEN" in old_tags:
+            new_tags.add(TLEN(encoding=3, text=old_tags["TLEN"].text[0]))
+        if "TENC" in old_tags:
+            new_tags.add(TENC(encoding=3, text=old_tags["TENC"].text[0]))
+        if "TSSE" in old_tags:
+            new_tags.add(TSSE(encoding=3, text=old_tags["TSSE"].text[0]))
+    return new_tags
+
 def edit_folder_tags(folder_path, artist_name):
     if not os.path.isdir(folder_path):
         print("Folder not found")
@@ -23,22 +38,8 @@ def edit_folder_tags(folder_path, artist_name):
         mp3_path = os.path.join(folder_path, filename)
         try:
             audio = MP3(mp3_path, ID3=ID3)
-            if audio.tags is None:
-                audio.add_tags()
             clean_name = clean_title(filename)
-            new_tags = ID3()
-            new_tags.add(TIT2(encoding=3, text=clean_name))
-            new_tags.add(TPE1(encoding=3, text=artist_name))
-            old_tags = audio.tags
-            if old_tags is not None:
-                if "TRCK" in old_tags:
-                    new_tags.add(TRCK(encoding=3, text=old_tags["TRCK"].text[0]))
-                if "TLEN" in old_tags:
-                    new_tags.add(TLEN(encoding=3, text=old_tags["TLEN"].text[0]))
-                if "TENC" in old_tags:
-                    new_tags.add(TENC(encoding=3, text=old_tags["TENC"].text[0]))
-                if "TSSE" in old_tags:
-                    new_tags.add(TSSE(encoding=3, text=old_tags["TSSE"].text[0]))
+            new_tags = build_new_tags(audio.tags, clean_name, artist_name)
             audio.tags = new_tags
             audio.save(v2_version=3, v1=2)
             print("Updated:", filename, "→ Title:", clean_name, "Artist:", artist_name)
